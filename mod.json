@@ -3,10 +3,10 @@
 	"gd": {
 		"win": "2.2081"
 	},
-	"id": "me.hack-menu",
+	"id": "beotng.hack-menu",
 	"name": "Hack Menu",
 	"version": "v1.0.0",
-	"developer": "Me",
+	"developer": "beotng",
 	"description": "A small mod menu with noclip, speedhack and hitboxes.",
 	"dependencies": {
 		"geode.node-ids": ">=v1.23.3"
