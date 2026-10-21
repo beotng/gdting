@@ -1,0 +1,53 @@
+{
+	"geode": "5.11.2",
+	"gd": {
+		"win": "2.2081"
+	},
+	"id": "me.hack-menu",
+	"name": "Hack Menu",
+	"version": "v1.0.0",
+	"developer": "Me",
+	"description": "A small mod menu with noclip, speedhack and hitboxes.",
+	"dependencies": {
+		"geode.node-ids": ">=v1.23.3"
+	},
+	"settings": {
+		"noclip": {
+			"type": "bool",
+			"name": "Noclip",
+			"description": "You can't die. Marks the attempt as cheated.",
+			"default": false
+		},
+		"speedhack": {
+			"type": "bool",
+			"name": "Speedhack",
+			"description": "Run the whole game faster or slower.",
+			"default": false
+		},
+		"speed": {
+			"type": "float",
+			"name": "Speed",
+			"description": "Game speed multiplier used while Speedhack is on.",
+			"default": 1.0,
+			"min": 0.1,
+			"max": 10.0,
+			"control": {
+				"input": true,
+				"slider": true,
+				"slider-step": 0.05
+			}
+		},
+		"speedhack-audio": {
+			"type": "bool",
+			"name": "Speedhack audio",
+			"description": "Change music and sound pitch to match the speed.",
+			"default": true
+		},
+		"hitboxes": {
+			"type": "bool",
+			"name": "Show hitboxes",
+			"description": "Draw hitboxes outside practice mode too.",
+			"default": false
+		}
+	}
+}
