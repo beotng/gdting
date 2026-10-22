@@ -1,5 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
+#include "Simulation.hpp"
 #include "State.hpp"
 
 using namespace geode::prelude;
@@ -68,9 +69,11 @@ class $modify(ClickBufferLayer, GJBaseGameLayer) {
     void processQueuedButtons(float dt, bool clearInputQueue) {
         auto fields = m_fields.operator->();
 
-        // Off or in the editor: behave like vanilla. A step counter that went
-        // backwards means the level restarted, so drop old clicks too.
-        bool active = g_hacks.clickBuffer && typeinfo_cast<PlayLayer*>(this);
+        // Off, in the editor, or survival delay is handling inputs: behave
+        // like vanilla. A step counter that went backwards means the level
+        // restarted, so drop old clicks too.
+        if (g_sim.active) return GJBaseGameLayer::processQueuedButtons(dt, clearInputQueue);
+        bool active = g_hacks.clickBuffer && !g_hacks.survivalDelay && typeinfo_cast<PlayLayer*>(this);
         if (!active || m_currentStep < fields->m_lastStep) {
             this->clearHeld();
         }

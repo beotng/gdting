@@ -48,6 +48,7 @@ namespace {
 //   F6   toggles frame advance
 //   F7   steps forward while frame advance is on (hold to repeat)
 //   F8   toggles the click buffer
+//   F9   toggles survival delay
 class $modify(CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(enumKeyCodes key, bool isKeyDown, bool isKeyRepeat, double timestamp) {
         if (isKeyDown) {
@@ -67,6 +68,10 @@ class $modify(CCKeyboardDispatcher) {
                 case KEY_F8:
                     if (isKeyRepeat) break;
                     toggleSetting("click-buffer", "Click buffer");
+                    return true;
+                case KEY_F9:
+                    if (isKeyRepeat) break;
+                    toggleSetting("survival-delay", "Survival delay");
                     return true;
                 default:
                     break;

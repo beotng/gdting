@@ -5,9 +5,9 @@
 	},
 	"id": "beotng.hack-menu",
 	"name": "Hack Menu",
-	"version": "v1.1.0",
+	"version": "v1.2.0",
 	"developer": "beotng",
-	"description": "A mod menu with noclip, speedhack, hitboxes, click buffer, frame advance, FPS bypass and safe mode.",
+	"description": "A mod menu with noclip, speedhack, hitboxes, click buffer, survival delay, frame advance, FPS bypass and safe mode.",
 	"dependencies": {
 		"geode.node-ids": ">=v1.23.3"
 	},
@@ -68,6 +68,38 @@
 				"slider-step": 1
 			}
 		},
+		"survival-delay": {
+			"type": "bool",
+			"name": "Survival delay",
+			"description": "Delays each jump press or release until the first frame where it won't kill you, by simulating ahead. Forces safe mode.",
+			"default": false
+		},
+		"delay-frames": {
+			"type": "int",
+			"name": "Max delay",
+			"description": "How many frames an input can be delayed before it goes through anyway.",
+			"default": 15,
+			"min": 1,
+			"max": 60,
+			"control": {
+				"input": true,
+				"slider": true,
+				"slider-step": 1
+			}
+		},
+		"delay-lookahead": {
+			"type": "int",
+			"name": "Lookahead",
+			"description": "How far ahead to check for death, in physics steps (240 per second). Higher is safer but slower.",
+			"default": 120,
+			"min": 10,
+			"max": 480,
+			"control": {
+				"input": true,
+				"slider": true,
+				"slider-step": 10
+			}
+		},
 		"frame-advance": {
 			"type": "bool",
 			"name": "Frame advance",
@@ -108,7 +140,7 @@
 		"safe-mode": {
 			"type": "bool",
 			"name": "Safe mode",
-			"description": "Don't save any progress from attempts. Always on while click buffer, frame advance or speedhack is active.",
+			"description": "Don't save any progress from attempts. Always on while click buffer, survival delay, frame advance or speedhack is active.",
 			"default": false
 		},
 		"cheat-indicator": {

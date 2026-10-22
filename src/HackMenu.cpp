@@ -19,6 +19,7 @@ namespace {
         { "speedhack", "Speedhack", &HackState::speedhack },
         { "speedhack-audio", "Speedhack audio", &HackState::speedhackAudio },
         { "click-buffer", "Click buffer", &HackState::clickBuffer },
+        { "survival-delay", "Survival delay", &HackState::survivalDelay },
         { "frame-advance", "Frame advance", &HackState::frameAdvance },
         { "fps-bypass", "FPS bypass", &HackState::fpsBypass },
         { "safe-mode", "Safe mode", &HackState::safeMode },
@@ -38,12 +39,14 @@ namespace {
         { "fps", "FPS", 30., 1000., false },
         { "buffer-steps", "Buffer steps", 1., 60., true },
         { "advance-steps", "Advance steps", 1., 60., true },
+        { "delay-frames", "Max delay", 1., 60., true },
+        { "delay-lookahead", "Lookahead", 10., 480., true },
     };
 
     constexpr float WIDTH = 420.f;
-    constexpr float HEIGHT = 290.f;
+    constexpr float HEIGHT = 300.f;
     constexpr float COLUMN_WIDTH = WIDTH / 2.f;
-    constexpr float ROW_HEIGHT = 30.f;
+    constexpr float ROW_HEIGHT = 27.f;
     constexpr float TOP = HEIGHT - 55.f;
 
     // Toggles and inputs are laid out left to right, two per row.
@@ -100,7 +103,7 @@ bool HackMenu::initMenu() {
     }
 
     auto hint = CCLabelBMFont::create(
-        "Tab: menu   F6: frame advance   F7: step   F8: click buffer", "chatFont.fnt"
+        "Tab: menu   F6: frame advance   F7: step   F8: click buffer   F9: survival delay", "chatFont.fnt"
     );
     hint->setScale(.6f);
     hint->setOpacity(180);

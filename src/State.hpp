@@ -16,11 +16,14 @@ struct HackState {
     float fps = 240.f;
     bool safeMode = false;
     bool cheatIndicator = true;
+    bool survivalDelay = false;
+    int delayFrames = 15;
+    int delayLookahead = 120;
 
     // Hacks GD's own anticheat can't see. While any of these is on, safe
     // mode is forced so the attempt can't save progress or a new best.
     bool undetectedCheats() const {
-        return clickBuffer || frameAdvance || (speedhack && speed != 1.f);
+        return clickBuffer || survivalDelay || frameAdvance || (speedhack && speed != 1.f);
     }
 
     bool safeModeActive() const {

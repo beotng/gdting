@@ -1,5 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
+#include "Simulation.hpp"
 #include "State.hpp"
 
 using namespace geode::prelude;
@@ -14,7 +15,8 @@ class $modify(HitboxPlayLayer, PlayLayer) {
 
     void postUpdate(float dt) {
         PlayLayer::postUpdate(dt);
-        if (!m_debugDrawNode) return;
+        // Don't redraw on every step SurvivalDelay simulates.
+        if (!m_debugDrawNode || g_sim.active) return;
 
         if (g_hacks.hitboxes) {
             bool wasEnabled = m_isDebugDrawEnabled;
