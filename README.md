@@ -9,7 +9,7 @@ A small Geode mod for Geometry Dash 2.2081 (Windows) with:
   robot or spider, with no orb) is held for up to N physics steps and fires as
   soon as you land or touch an orb.
 - **Survival delay**: a jump press or release that would kill you is held for up
-  to N frames until it's safe, and a press that's still deadly is cancelled.
+  to N physics steps until a later moment is safe, and a press that's never safe is cancelled.
   Checked by stepping an invisible copy of you ahead; the real game is never
   rewound. Safe inputs go through right away.
 - **Frame advance**: freeze gameplay and step forward N physics steps at a time.

@@ -17,8 +17,8 @@ struct HackState {
     bool safeMode = false;
     bool cheatIndicator = true;
     bool survivalDelay = false;
-    int delayFrames = 15;
-    int delayLookahead = 120;
+    int delaySteps = 16;
+    int delayLookahead = 60;
 
     // Hacks GD's own anticheat can't see. While any of these is on, safe
     // mode is forced so the attempt can't save progress or a new best.

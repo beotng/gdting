@@ -5,7 +5,7 @@
 	},
 	"id": "beotng.hack-menu",
 	"name": "Hack Menu",
-	"version": "v1.2.1",
+	"version": "v1.2.2",
 	"developer": "beotng",
 	"description": "A mod menu with noclip, speedhack, hitboxes, click buffer, survival delay, frame advance, FPS bypass and safe mode.",
 	"dependencies": {
@@ -74,13 +74,13 @@
 			"description": "Holds a jump press or release for a few frames if it would kill you, and cancels it if it still would. Checks by simulating an invisible copy of you ahead. Forces safe mode.",
 			"default": false
 		},
-		"delay-frames": {
+		"delay-steps": {
 			"type": "int",
 			"name": "Max delay",
-			"description": "How many frames a deadly input can wait for a safe moment before a press is cancelled (a release still goes through).",
-			"default": 5,
+			"description": "How long a deadly input may be held waiting for a safe moment, in physics steps (240 per second; 16 is about 4 frames at 60 FPS). A press that's never safe in that window is cancelled if not jumping survives.",
+			"default": 16,
 			"min": 1,
-			"max": 30,
+			"max": 60,
 			"control": {
 				"input": true,
 				"slider": true,

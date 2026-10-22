@@ -39,7 +39,7 @@ namespace {
         { "fps", "FPS", 30., 1000., false },
         { "buffer-steps", "Buffer steps", 1., 60., true },
         { "advance-steps", "Advance steps", 1., 60., true },
-        { "delay-frames", "Max delay", 1., 30., true },
+        { "delay-steps", "Max delay", 1., 60., true },
         { "delay-lookahead", "Lookahead", 10., 240., true },
     };
 

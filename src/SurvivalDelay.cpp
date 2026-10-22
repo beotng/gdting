@@ -5,26 +5,32 @@
 #include "Simulation.hpp"
 #include "State.hpp"
 
+#include <algorithm>
 #include <deque>
+#include <string>
 
 using namespace geode::prelude;
 
 // Survival delay. Every jump press or release is taken out of GD's input
 // queue and checked before it's applied: an invisible copy of the player is
 // stepped `delay-lookahead` physics steps ahead against the level's hitboxes,
-// once with the input and once without.
+// with the input applied now, a little later, or never.
 //
-//  - Safe input: applied right away.
-//  - Input that kills you but waiting doesn't: held, and re-checked every
-//    frame for up to `delay-frames` frames.
-//  - Still deadly after that: a press is cancelled (along with its release);
-//    a release goes through, so you never get stuck holding.
-//  - Input that kills you either way: applied, since waiting can't help.
+//  - Safe now: applied right away.
+//  - Deadly now, but safe if applied a few steps later (e.g. a jump pressed
+//    slightly too early): held and re-checked every frame, for up to
+//    `delay-steps` physics steps in total.
+//  - Never safe within that window: a press is cancelled (with its release)
+//    if not jumping survives; otherwise it goes through, since nothing helps.
+//    Releases always go through eventually, so you never get stuck holding.
 //
 // The real game is never stepped or rolled back, so nothing in the level can
 // get out of sync. The copy only collides with the level; anything it touches
 // that would change the real game (triggers, coins, portals that move the
 // camera, end of level) is ignored while simulating.
+//
+// Decisions and deaths are written to the Geode log ("Survival delay: ...")
+// so its behaviour can be checked after playing.
 namespace {
     // GD's real per-step delta, recorded from the real player each step.
     float g_stepDelta = 0.25f;
@@ -32,8 +38,13 @@ namespace {
     struct PendingInput {
         bool push;
         bool isPlayer2;
-        int age = 0;
+        int queuedStep;
+        bool held = false;
     };
+
+    // The last decision, to explain the next death in the log.
+    std::string g_lastDecision = "none";
+    int g_lastDecisionStep = 0;
 
     bool isSim(PlayerObject* player) {
         return g_sim.active && player == g_sim.player;
@@ -64,9 +75,10 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         return fields->m_simPlayer;
     }
 
-    // Steps a copy of `real` ahead, optionally applying a jump input first.
+    // Steps a copy of `real` ahead, applying a jump input after `applyAt`
+    // steps (never if negative), then `delay-lookahead` more steps.
     // Returns whether it's still alive at the end.
-    bool simulate(PlayerObject* real, bool applyInput, bool push) {
+    bool simulate(PlayerObject* real, int applyAt, bool push) {
         if (!real || real->m_isDead) return true;
 
         auto sim = this->getSimPlayer();
@@ -77,11 +89,12 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         sim->m_isDead = false;
 
         g_sim = { true, false, sim };
-        if (applyInput) {
-            if (push) sim->pushButton(PlayerButton::Jump);
-            else sim->releaseButton(PlayerButton::Jump);
-        }
-        for (int i = 0; i < g_hacks.delayLookahead && !g_sim.died; i++) {
+        int total = std::max(applyAt, 0) + g_hacks.delayLookahead;
+        for (int i = 0; i < total && !g_sim.died; i++) {
+            if (i == applyAt) {
+                if (push) sim->pushButton(PlayerButton::Jump);
+                else sim->releaseButton(PlayerButton::Jump);
+            }
             sim->update(g_stepDelta);
             this->checkCollisions(sim, g_stepDelta, false);
             sim->updateRotation(g_stepDelta);
@@ -100,20 +113,37 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         return { p1, p2 };
     }
 
-    bool survives(PendingInput const& input, bool applyInput) {
+    bool survivesAt(PendingInput const& input, int applyAt) {
         auto [p1, p2] = this->affectedPlayers(input);
-        if (p1 && !this->simulate(m_player1, applyInput, input.push)) return false;
-        if (p2 && !this->simulate(m_player2, applyInput, input.push)) return false;
+        if (p1 && !this->simulate(m_player1, applyAt, input.push)) return false;
+        if (p2 && !this->simulate(m_player2, applyAt, input.push)) return false;
         return true;
+    }
+
+    // Whether holding the input for some of the remaining steps would make
+    // it safe. Checks at most ~6 evenly spaced timings to stay cheap.
+    bool waitingHelps(PendingInput const& input, int remaining) {
+        if (remaining <= 0) return false;
+        int stride = std::max(1, remaining / 6);
+        for (int k = stride; k <= remaining; k += stride) {
+            if (this->survivesAt(input, k)) return true;
+        }
+        return false;
     }
 
     void applyInput(PendingInput const& input) {
         this->handleButton(input.push, static_cast<int>(PlayerButton::Jump), !input.isPlayer2);
     }
 
+    void record(PendingInput const& input, std::string const& what, bool print) {
+        g_lastDecision = fmt::format("{} {}", input.push ? "press" : "release", what);
+        g_lastDecisionStep = m_currentStep;
+        if (print) log::info("Survival delay: {}", g_lastDecision);
+    }
+
     // Decides what to do with the oldest pending input. Returns false if it
     // has to keep waiting.
-    bool resolve(PendingInput const& input) {
+    bool resolve(PendingInput& input) {
         auto& dropped = m_fields->m_droppedPush[input.isPlayer2 ? 1 : 0];
 
         if (!input.push && dropped) {
@@ -122,14 +152,25 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         }
         if (input.push) dropped = false;
 
-        if (this->survives(input, true) || !this->survives(input, false)) {
+        int waited = std::max(0, m_currentStep - input.queuedStep);
+        if (this->survivesAt(input, 0)) {
             this->applyInput(input);
+            if (input.held) this->record(input, fmt::format("held {} steps, then applied", waited), true);
+            else this->record(input, "applied (safe)", false);
             return true;
         }
-        if (input.age < g_hacks.delayFrames) return false;
-
-        if (input.push) dropped = true;
-        else this->applyInput(input);
+        if (this->waitingHelps(input, g_hacks.delaySteps - waited)) {
+            if (!input.held) this->record(input, "would kill you, holding", true);
+            input.held = true;
+            return false;
+        }
+        if (input.push && this->survivesAt(input, -1)) {
+            dropped = true;
+            this->record(input, fmt::format("cancelled after {} steps", waited), true);
+            return true;
+        }
+        this->applyInput(input);
+        this->record(input, "deadly at every timing, applied anyway", true);
         return true;
     }
 
@@ -153,7 +194,7 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         // Take this frame's jump inputs out of GD's queue.
         for (auto it = m_queuedButtons.begin(); it != m_queuedButtons.end();) {
             if (it->m_button == PlayerButton::Jump) {
-                pending.push_back({ it->m_isPush, it->m_isPlayer2 });
+                pending.push_back({ it->m_isPush, it->m_isPlayer2, m_currentStep });
                 it = m_queuedButtons.erase(it);
             }
             else {
@@ -164,7 +205,6 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         while (!pending.empty() && this->resolve(pending.front())) {
             pending.pop_front();
         }
-        for (auto& input : pending) input.age++;
 
         GJBaseGameLayer::update(dt);
     }
@@ -249,6 +289,17 @@ class $modify(SurvivalDelayPlayer, PlayerObject) {
 };
 
 class $modify(SurvivalDelayPlayLayer, PlayLayer) {
+    void destroyPlayer(PlayerObject* player, GameObject* object) {
+        if (!g_sim.active && g_hacks.survivalDelay && !g_hacks.noclip
+            && object != m_anticheatSpike && player && !player->m_isDead) {
+            log::info(
+                "Survival delay: died; last input was {} ({} steps before)",
+                g_lastDecision, m_currentStep - g_lastDecisionStep
+            );
+        }
+        PlayLayer::destroyPlayer(player, object);
+    }
+
     // The copy reaching the end of the level counts as surviving, and must
     // not actually complete it.
     void levelComplete() {
