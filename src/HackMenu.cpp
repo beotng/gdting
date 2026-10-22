@@ -20,6 +20,7 @@ namespace {
         { "speedhack-audio", "Speedhack audio", &HackState::speedhackAudio },
         { "click-buffer", "Click buffer", &HackState::clickBuffer },
         { "survival-delay", "Survival delay", &HackState::survivalDelay },
+        { "show-trajectory", "Show trajectory", &HackState::showTrajectory },
         { "frame-advance", "Frame advance", &HackState::frameAdvance },
         { "fps-bypass", "FPS bypass", &HackState::fpsBypass },
         { "safe-mode", "Safe mode", &HackState::safeMode },
@@ -44,7 +45,7 @@ namespace {
     };
 
     constexpr float WIDTH = 420.f;
-    constexpr float HEIGHT = 300.f;
+    constexpr float HEIGHT = 320.f;
     constexpr float COLUMN_WIDTH = WIDTH / 2.f;
     constexpr float ROW_HEIGHT = 27.f;
     constexpr float TOP = HEIGHT - 55.f;

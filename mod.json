@@ -5,7 +5,7 @@
 	},
 	"id": "beotng.hack-menu",
 	"name": "Hack Menu",
-	"version": "v1.2.4",
+	"version": "v1.3.0",
 	"developer": "beotng",
 	"description": "A mod menu with noclip, speedhack, hitboxes, click buffer, survival delay, frame advance, FPS bypass and safe mode.",
 	"dependencies": {
@@ -72,6 +72,12 @@
 			"type": "bool",
 			"name": "Survival delay",
 			"description": "Holds a jump press or release for a few frames if it would kill you, and cancels it if it still would. Checks by simulating an invisible copy of you ahead. Forces safe mode.",
+			"default": false
+		},
+		"show-trajectory": {
+			"type": "bool",
+			"name": "Show trajectory",
+			"description": "Draws the path survival delay predicts from right now: green if you make your next input (jump, or let go while holding), gray if you don't. A red box marks where a path dies.",
 			"default": false
 		},
 		"delay-steps": {

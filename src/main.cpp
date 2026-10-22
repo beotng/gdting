@@ -25,6 +25,7 @@ $on_mod(Loaded) {
     bind<int64_t>("advance-steps", [](int64_t v) { g_hacks.advanceSteps = static_cast<int>(v); });
     bind<bool>("safe-mode", [](bool v) { g_hacks.safeMode = v; });
     bind<bool>("survival-delay", [](bool v) { g_hacks.survivalDelay = v; });
+    bind<bool>("show-trajectory", [](bool v) { g_hacks.showTrajectory = v; });
     bind<int64_t>("delay-steps", [](int64_t v) { g_hacks.delaySteps = static_cast<int>(v); });
     bind<int64_t>("max-lookahead", [](int64_t v) { g_hacks.maxLookahead = static_cast<int>(v); });
     bind<bool>("cheat-indicator", [](bool v) { g_hacks.cheatIndicator = v; });

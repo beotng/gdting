@@ -12,6 +12,9 @@ A small Geode mod for Geometry Dash 2.2081 (Windows) with:
   to N physics steps until a later moment is safe, and a press that's never safe is cancelled.
   Checked by stepping an invisible copy of you ahead; the real game is never
   rewound. Safe inputs go through right away.
+- **Show trajectory**: draws survival delay's prediction from right now, like
+  trajectory views in other mod menus: green with your next input, gray
+  without, red box where a path dies.
 - **Frame advance**: freeze gameplay and step forward N physics steps at a time.
 - **FPS bypass**: pick your own frame rate.
 - **Safe mode**: nothing from the attempt is saved. Forced on while click

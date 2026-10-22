@@ -17,6 +17,7 @@ struct HackState {
     bool safeMode = false;
     bool cheatIndicator = true;
     bool survivalDelay = false;
+    bool showTrajectory = false;
     int delaySteps = 16;
     int maxLookahead = 240;
 

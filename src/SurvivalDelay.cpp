@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <deque>
 #include <string>
+#include <vector>
 
 using namespace geode::prelude;
 
@@ -88,6 +89,7 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         std::deque<PendingInput> m_pending;
         Ref<CCLayer> m_simHolder;
         Ref<PlayerObject> m_simPlayer;
+        Ref<CCDrawNode> m_trajectoryNode;
         // A cancelled press also cancels its release, per player.
         bool m_droppedPush[2] = { false, false };
     };
@@ -110,13 +112,39 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
     // Steps a copy of `real` ahead like a trajectory preview, applying a jump
     // input after `applyAt` steps (never if negative). Follows the input's
     // trajectory (see MIN_AIR_STEPS etc.), up to `max-lookahead` steps, or
-    // exactly `fixedSteps` steps if that's given.
-    SimResult simulate(PlayerObject* real, int applyAt, bool push, int fixedSteps) {
+    // exactly `fixedSteps` steps if that's given. If `path` is given, the
+    // copy's position after every step is appended to it.
+    SimResult simulate(
+        PlayerObject* real, int applyAt, bool push, int fixedSteps, std::vector<CCPoint>* path = nullptr
+    ) {
         if (!real || real->m_isDead) return {};
 
         auto sim = this->getSimPlayer();
         sim->copyAttributes(real);
+        // copyAttributes doesn't cover everything physics uses; most
+        // importantly GD's own position field, which the node position
+        // doesn't update.
+        sim->m_position = real->m_position;
         sim->setPosition(real->getPosition());
+        sim->setScale(real->getScale());
+        sim->m_yVelocity = real->m_yVelocity;
+        sim->m_playerSpeed = real->m_playerSpeed;
+        sim->m_vehicleSize = real->m_vehicleSize;
+        sim->m_gravityMod = real->m_gravityMod;
+        sim->m_isUpsideDown = real->m_isUpsideDown;
+        sim->m_isGoingLeft = real->m_isGoingLeft;
+        sim->m_isPlatformer = real->m_isPlatformer;
+        sim->m_isOnGround = real->m_isOnGround;
+        sim->m_isShip = real->m_isShip;
+        sim->m_isBird = real->m_isBird;
+        sim->m_isBall = real->m_isBall;
+        sim->m_isDart = real->m_isDart;
+        sim->m_isRobot = real->m_isRobot;
+        sim->m_isSpider = real->m_isSpider;
+        sim->m_isSwing = real->m_isSwing;
+        sim->m_lastGroundedPos = real->m_lastGroundedPos;
+        sim->m_objectSnappedTo = real->m_objectSnappedTo;
+        sim->m_collidedObject = real->m_collidedObject;
         sim->m_holdingButtons = real->m_holdingButtons;
         sim->m_jumpBuffered = real->m_jumpBuffered;
         sim->m_isDead = false;
@@ -138,6 +166,7 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
             this->checkCollisions(sim, g_stepDelta, false);
             sim->updateRotation(g_stepDelta);
             steps++;
+            if (path) path->push_back(sim->m_position);
 
             if (fixedSteps >= 0 || g_sim.died) continue;
             int since = steps - start;
@@ -196,8 +225,10 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
             g_pressStep[player] = g_realStep;
         }
         else if (g_pressStep[player] >= 0) {
+            // Long holds (ship, wave, holding through a section) aren't taps
+            // and would skew the estimate, so only learn from short ones.
             int held = g_realStep - g_pressStep[player];
-            g_holdSteps = std::clamp((g_holdSteps * 3 + held) / 4, 2, 60);
+            if (held <= 40) g_holdSteps = std::clamp((g_holdSteps * 3 + held) / 4, 2, 40);
             g_pressStep[player] = -1;
         }
     }
@@ -257,6 +288,61 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
     }
 
     void update(float dt) {
+        this->handleInputs();
+        GJBaseGameLayer::update(dt);
+        this->drawTrajectories();
+    }
+
+    CCDrawNode* getTrajectoryNode() {
+        auto fields = m_fields.operator->();
+        if (!fields->m_trajectoryNode) {
+            fields->m_trajectoryNode = CCDrawNode::create();
+            m_objectLayer->addChild(fields->m_trajectoryNode, 1000);
+        }
+        return fields->m_trajectoryNode;
+    }
+
+    void drawPath(CCDrawNode* node, std::vector<CCPoint> const& path, CCPoint start, bool died, ccColor4F color) {
+        CCPoint prev = start;
+        for (auto const& point : path) {
+            node->drawSegment(prev, point, .8f, color);
+            prev = point;
+        }
+        if (died) {
+            constexpr float HALF = 15.f;
+            CCPoint box[] = {
+                { prev.x - HALF, prev.y - HALF }, { prev.x + HALF, prev.y - HALF },
+                { prev.x + HALF, prev.y + HALF }, { prev.x - HALF, prev.y + HALF },
+            };
+            node->drawPolygon(box, 4, { 0.f, 0.f, 0.f, 0.f }, 1.f, { 1.f, 0.f, 0.f, 1.f });
+        }
+    }
+
+    // "Show trajectory": draws what the simulation predicts from right now.
+    // Green: making your next input this step (jump, or let go if you're
+    // holding). Gray: doing nothing. A red box marks where a path dies.
+    void drawTrajectories() {
+        auto playLayer = typeinfo_cast<PlayLayer*>(this);
+        if (!playLayer) return;
+        auto node = this->getTrajectoryNode();
+        node->clear();
+        if (!g_hacks.showTrajectory || m_player1->m_isDead || m_levelEndAnimationStarted) return;
+
+        bool dual = m_gameState.m_isDualMode && m_player2;
+        for (auto player : { m_player1, dual ? m_player2 : nullptr }) {
+            if (!player || player->m_isDead) continue;
+            auto held = player->m_holdingButtons.find(static_cast<int>(PlayerButton::Jump));
+            bool holding = held != player->m_holdingButtons.end() && held->second;
+
+            std::vector<CCPoint> withInput, without;
+            auto a = this->simulate(player, 0, !holding, -1, &withInput);
+            auto b = this->simulate(player, -1, !holding, std::max(a.steps, 60), &without);
+            this->drawPath(node, without, player->m_position, b.died, { .75f, .75f, .75f, .8f });
+            this->drawPath(node, withInput, player->m_position, a.died, { 0.f, .85f, 0.f, 1.f });
+        }
+    }
+
+    void handleInputs() {
         auto fields = m_fields.operator->();
         auto& pending = fields->m_pending;
         bool active = g_hacks.survivalDelay && !g_hacks.frameAdvance
@@ -270,7 +356,7 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
             }
             pending.clear();
             fields->m_droppedPush[0] = fields->m_droppedPush[1] = false;
-            return GJBaseGameLayer::update(dt);
+            return;
         }
 
         // Take this frame's jump inputs out of GD's queue.
@@ -287,8 +373,6 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         while (!pending.empty() && this->resolve(pending.front())) {
             pending.pop_front();
         }
-
-        GJBaseGameLayer::update(dt);
     }
 
     // Things the simulated player may touch that would change the real game.
@@ -386,6 +470,11 @@ class $modify(SurvivalDelayPlayLayer, PlayLayer) {
                     g_last.horizon, since
                 );
             }
+        }
+        // A press before a death isn't released until after the respawn;
+        // don't count that as one long hold.
+        if (!g_sim.active && object != m_anticheatSpike) {
+            g_pressStep[0] = g_pressStep[1] = -1;
         }
         PlayLayer::destroyPlayer(player, object);
     }
