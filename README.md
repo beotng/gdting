@@ -14,11 +14,11 @@ A small Geode mod for Geometry Dash 2.2081 (Windows) with:
   buffer, frame advance or speedhack is active, since GD can't detect those.
 - **Cheat indicator**: "Cheating" / "Safe mode" label in the corner.
 
-Open the menu with **Tab**, or with the **Hacks** button in the pause menu.
+Open the menu with **F2**, or with the **Hacks** button in the pause menu.
 
 | Key | Action |
 |---|---|
-| Tab | Open the menu |
+| F2 | Open the menu |
 | F6 | Toggle frame advance |
 | F7 | Step forward (hold to repeat) |
 | F8 | Toggle click buffer |

@@ -30,20 +30,21 @@ jobs:
           path: ${{ steps.build.outputs.build-output }}/*.geode
 
       # Keeps one rolling "latest-build" release up to date with main, so
-      # installer/install.ps1 always has a .geode file to download.
-      - name: Publish latest build
+      # installer/install.ps1 always has a .geode file to download. The build
+      # output is a Windows path, so copy the file somewhere relative first.
+      - name: Collect .geode for release
         if: github.ref == 'refs/heads/main'
         shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
         run: |
-          # The build output is a Windows path, so this step uses PowerShell
-          # (bash would eat the backslashes).
-          gh release delete latest-build --yes --cleanup-tag 2>$null
-          $files = Get-ChildItem -LiteralPath "${{ steps.build.outputs.build-output }}" -Filter *.geode |
-            ForEach-Object FullName
-          gh release create latest-build @files `
-            --title "Latest build" `
-            --notes "Built automatically from ${{ github.sha }}." `
-            --target ${{ github.sha }}
+          New-Item -ItemType Directory -Force release | Out-Null
+          Copy-Item -Path (Join-Path "${{ steps.build.outputs.build-output }}" "*.geode") -Destination release
+
+      - name: Publish latest build
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest-build
+          name: Latest build
+          body: Built automatically from ${{ github.sha }}.
+          files: release/*.geode
+          fail_on_unmatched_files: true

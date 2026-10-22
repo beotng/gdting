@@ -44,7 +44,7 @@ namespace {
 }
 
 // Hotkeys:
-//   Tab  opens the menu from anywhere
+//   F2   opens the menu from anywhere (not Tab: Mega Hack uses it)
 //   F6   toggles frame advance
 //   F7   steps forward while frame advance is on (hold to repeat)
 //   F8   toggles the click buffer
@@ -52,7 +52,7 @@ class $modify(CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(enumKeyCodes key, bool isKeyDown, bool isKeyRepeat, double timestamp) {
         if (isKeyDown) {
             switch (key) {
-                case KEY_Tab:
+                case KEY_F2:
                     if (isKeyRepeat) break;
                     HackMenu::open();
                     return true;
