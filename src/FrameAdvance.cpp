@@ -3,6 +3,7 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/fmod/fmod.hpp>
 #include "FrameAdvance.hpp"
+#include "Simulation.hpp"
 #include "State.hpp"
 
 #include <utility>
@@ -38,6 +39,7 @@ void frame_advance::step(int steps) {
 
 class $modify(FrameAdvanceLayer, GJBaseGameLayer) {
     void update(float dt) {
+        if (g_sim.active) return GJBaseGameLayer::update(dt);
         bool frozen = g_hacks.frameAdvance && typeinfo_cast<PlayLayer*>(this)
             && !m_levelEndAnimationStarted;
         setMusicPaused(frozen);
