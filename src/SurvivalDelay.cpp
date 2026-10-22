@@ -2,10 +2,12 @@
 #include <Geode/modify/GJBaseGameLayer.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/PlayerObject.hpp>
+#include <Geode/modify/MenuLayer.hpp>
 #include "Simulation.hpp"
 #include "State.hpp"
 
 #include <algorithm>
+#include <filesystem>
 #include <deque>
 #include <string>
 #include <vector>
@@ -74,6 +76,51 @@ namespace {
         bool safe = false;
     };
     Prediction g_last;
+
+    // Self-test, started by creating an empty file named "autotest" in the
+    // mod's save folder. Opens Stereo Madness, makes deliberately early
+    // clicks with survival delay on and off on alternate attempts, logs
+    // whether the real player survived each one, then quits to the menu.
+    struct AutoTest {
+        static constexpr int ATTEMPTS = 20;
+
+        bool active = false;
+        int attempt = 0;
+        int releaseAt = -1;
+        int cooldownUntil = 0;
+        bool watching = false;
+        bool watchedWithDelay = false;
+        int watchUntil = 0;
+        int tests[2] = { 0, 0 };
+        int survived[2] = { 0, 0 };
+        bool savedSurvivalDelay = false;
+        bool savedSafeMode = false;
+
+        void startWatch(int until) {
+            watching = true;
+            watchedWithDelay = g_hacks.survivalDelay;
+            watchUntil = until;
+        }
+        void finishWatch(bool alive) {
+            if (!watching) return;
+            watching = false;
+            int i = watchedWithDelay ? 1 : 0;
+            tests[i]++;
+            if (alive) survived[i]++;
+            log::info("AutoTest: early click with survival delay {} -> {}", watchedWithDelay ? "ON" : "OFF",
+                alive ? "SURVIVED" : "DIED");
+        }
+        void finish() {
+            active = false;
+            g_hacks.survivalDelay = savedSurvivalDelay;
+            g_hacks.safeMode = savedSafeMode;
+            log::info(
+                "AutoTest: done. Early clicks survived with survival delay ON: {}/{}, OFF: {}/{}",
+                survived[1], tests[1], survived[0], tests[0]
+            );
+        }
+    };
+    AutoTest g_test;
 
     bool isSim(PlayerObject* player) {
         return g_sim.active && player == g_sim.player;
@@ -287,7 +334,58 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         return true;
     }
 
+    void queueJump(bool push) {
+        PlayerButtonCommand command;
+        command.m_button = PlayerButton::Jump;
+        command.m_isPush = push;
+        command.m_isPlayer2 = false;
+        command.m_step = m_currentStep;
+        command.m_timestamp = 0.0;
+        m_queuedButtons.push_back(command);
+    }
+
+    // Self-test (see AutoTest below): plays by itself, and whenever jumping
+    // now would land on a hazard but jumping a few steps later wouldn't, it
+    // clicks now, too early on purpose, through the same queue real clicks
+    // use. It then watches whether the real player survives.
+    void runAutoTest() {
+        if (!g_test.active || !typeinfo_cast<PlayLayer*>(this) || m_player1->m_isDead) return;
+
+        if (g_test.watching && g_realStep >= g_test.watchUntil) g_test.finishWatch(true);
+        if (g_test.releaseAt >= 0 && g_realStep >= g_test.releaseAt) {
+            this->queueJump(false);
+            g_test.releaseAt = -1;
+        }
+        if (g_test.releaseAt >= 0 || g_realStep < g_test.cooldownUntil) return;
+        if (!m_player1->m_isOnGround || isFlying(m_player1)) return;
+
+        // Only act when not jumping runs into something soon.
+        if (!this->simulate(m_player1, -1, true, 60).died) return;
+
+        PendingInput probe = { true, false, g_realStep };
+        bool nowSafe = !this->simulateInput(probe, 0).died;
+        int later = -1;
+        if (!nowSafe) {
+            for (int k = 1; k <= 12 && later < 0; k++) {
+                if (!this->simulateInput(probe, k).died) later = k;
+            }
+            if (later < 0) return;
+        }
+
+        this->queueJump(true);
+        g_test.releaseAt = g_realStep + 10;
+        g_test.cooldownUntil = g_realStep + 40;
+        if (!nowSafe) {
+            g_test.startWatch(g_realStep + 120);
+            log::info(
+                "AutoTest: early click (jumping now hits a hazard, {} steps later is safe), survival delay {}",
+                later, g_hacks.survivalDelay ? "ON" : "OFF"
+            );
+        }
+    }
+
     void update(float dt) {
+        this->runAutoTest();
         this->handleInputs();
         GJBaseGameLayer::update(dt);
         this->drawTrajectories();
@@ -459,6 +557,27 @@ class $modify(SurvivalDelayPlayer, PlayerObject) {
 };
 
 class $modify(SurvivalDelayPlayLayer, PlayLayer) {
+    // AutoTest alternates survival delay on and off between attempts, and
+    // stops after enough attempts.
+    void resetLevel() {
+        PlayLayer::resetLevel();
+        if (!g_test.active) return;
+
+        g_test.watching = false;
+        g_test.releaseAt = -1;
+        g_test.cooldownUntil = 0;
+        g_test.attempt++;
+        if (g_test.attempt > AutoTest::ATTEMPTS) {
+            g_test.finish();
+            queueInMainThread([] {
+                if (auto playLayer = PlayLayer::get()) playLayer->onQuit();
+            });
+            return;
+        }
+        g_hacks.survivalDelay = g_test.attempt % 2 == 1;
+        log::info("AutoTest: attempt {}, survival delay {}", g_test.attempt, g_hacks.survivalDelay ? "ON" : "OFF");
+    }
+
     void destroyPlayer(PlayerObject* player, GameObject* object) {
         if (!g_sim.active && g_hacks.survivalDelay && !g_hacks.noclip
             && object != m_anticheatSpike && player && !player->m_isDead) {
@@ -473,6 +592,9 @@ class $modify(SurvivalDelayPlayLayer, PlayLayer) {
         }
         // A press before a death isn't released until after the respawn;
         // don't count that as one long hold.
+        if (!g_sim.active && object != m_anticheatSpike && g_test.watching) {
+            g_test.finishWatch(false);
+        }
         if (!g_sim.active && object != m_anticheatSpike) {
             g_pressStep[0] = g_pressStep[1] = -1;
         }
@@ -492,5 +614,32 @@ class $modify(SurvivalDelayPlayLayer, PlayLayer) {
     void playPlatformerEndAnimationToPos(CCPoint position, bool instant) {
         if (g_sim.active) return;
         PlayLayer::playPlatformerEndAnimationToPos(position, instant);
+    }
+};
+
+class $modify(SurvivalDelayMenuLayer, MenuLayer) {
+    // Starts AutoTest if the trigger file exists (and removes it, so the
+    // test runs once).
+    bool init() {
+        if (!MenuLayer::init()) return false;
+
+        auto trigger = Mod::get()->getSaveDir() / "autotest";
+        std::error_code error;
+        if (g_test.active || !std::filesystem::exists(trigger, error)) return true;
+        std::filesystem::remove(trigger, error);
+
+        g_test = {};
+        g_test.active = true;
+        g_test.savedSurvivalDelay = g_hacks.survivalDelay;
+        g_test.savedSafeMode = g_hacks.safeMode;
+        g_hacks.safeMode = true;
+        g_hacks.survivalDelay = true;
+        log::info("AutoTest: starting on Stereo Madness");
+
+        queueInMainThread([] {
+            auto level = GameLevelManager::sharedState()->getMainLevel(1, false);
+            CCDirector::get()->replaceScene(PlayLayer::scene(level, false, false));
+        });
+        return true;
     }
 };
