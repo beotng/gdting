@@ -26,7 +26,7 @@ $on_mod(Loaded) {
     bind<bool>("safe-mode", [](bool v) { g_hacks.safeMode = v; });
     bind<bool>("survival-delay", [](bool v) { g_hacks.survivalDelay = v; });
     bind<int64_t>("delay-steps", [](int64_t v) { g_hacks.delaySteps = static_cast<int>(v); });
-    bind<int64_t>("delay-lookahead", [](int64_t v) { g_hacks.delayLookahead = static_cast<int>(v); });
+    bind<int64_t>("max-lookahead", [](int64_t v) { g_hacks.maxLookahead = static_cast<int>(v); });
     bind<bool>("cheat-indicator", [](bool v) { g_hacks.cheatIndicator = v; });
     // fps-bypass and fps are bound in FpsBypass.cpp, since changing them
     // has to re-apply the frame rate.

@@ -40,7 +40,7 @@ namespace {
         { "buffer-steps", "Buffer steps", 1., 60., true },
         { "advance-steps", "Advance steps", 1., 60., true },
         { "delay-steps", "Max delay", 1., 60., true },
-        { "delay-lookahead", "Lookahead", 10., 240., true },
+        { "max-lookahead", "Max lookahead", 60., 480., true },
     };
 
     constexpr float WIDTH = 420.f;

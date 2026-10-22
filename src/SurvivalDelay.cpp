@@ -12,9 +12,10 @@
 using namespace geode::prelude;
 
 // Survival delay. Every jump press or release is taken out of GD's input
-// queue and checked before it's applied: an invisible copy of the player is
-// stepped `delay-lookahead` physics steps ahead against the level's hitboxes,
-// with the input applied now, a little later, or never.
+// queue and checked before it's applied: like a trajectory preview, an
+// invisible copy of the player is stepped ahead against the level's hitboxes
+// with the input applied now, a little later, or never, following the
+// input's own trajectory (until a jump lands; briefly for flying modes).
 //
 //  - Safe now: applied right away.
 //  - Deadly now, but safe if applied a few steps later (e.g. a jump pressed
@@ -34,6 +35,15 @@ using namespace geode::prelude;
 namespace {
     // GD's real per-step delta, recorded from the real player each step.
     float g_stepDelta = 0.25f;
+    // Real physics steps taken by player 1, used to time inputs.
+    int g_realStep = 0;
+
+    // How far an input's trajectory is followed. Ground modes: until the
+    // player has landed and stayed down a moment. Flying modes: a short
+    // window, since the next input comes soon anyway.
+    constexpr int MIN_AIR_STEPS = 6;
+    constexpr int LANDED_STEPS = 8;
+    constexpr int FLYING_HORIZON = 48;
 
     struct PendingInput {
         bool push;
@@ -42,12 +52,28 @@ namespace {
         bool held = false;
     };
 
-    // The last decision, to explain the next death in the log.
-    std::string g_lastDecision = "none";
-    int g_lastDecisionStep = 0;
+    struct SimResult {
+        bool died = false;
+        // Steps simulated, or the step the copy died on.
+        int steps = 0;
+    };
+
+    // What was predicted for the last input that went through, to compare
+    // with reality if the player then dies.
+    struct Prediction {
+        std::string what = "none";
+        int step = 0;
+        int horizon = 0;
+        bool safe = false;
+    };
+    Prediction g_last;
 
     bool isSim(PlayerObject* player) {
         return g_sim.active && player == g_sim.player;
+    }
+
+    bool isFlying(PlayerObject* player) {
+        return player->m_isShip || player->m_isBird || player->m_isDart || player->m_isSwing;
     }
 }
 
@@ -75,11 +101,12 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         return fields->m_simPlayer;
     }
 
-    // Steps a copy of `real` ahead, applying a jump input after `applyAt`
-    // steps (never if negative), then `delay-lookahead` more steps.
-    // Returns whether it's still alive at the end.
-    bool simulate(PlayerObject* real, int applyAt, bool push) {
-        if (!real || real->m_isDead) return true;
+    // Steps a copy of `real` ahead like a trajectory preview, applying a jump
+    // input after `applyAt` steps (never if negative). Follows the input's
+    // trajectory (see MIN_AIR_STEPS etc.), up to `max-lookahead` steps, or
+    // exactly `fixedSteps` steps if that's given.
+    SimResult simulate(PlayerObject* real, int applyAt, bool push, int fixedSteps) {
+        if (!real || real->m_isDead) return {};
 
         auto sim = this->getSimPlayer();
         sim->copyAttributes(real);
@@ -89,19 +116,33 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         sim->m_isDead = false;
 
         g_sim = { true, false, sim };
-        int total = std::max(applyAt, 0) + g_hacks.delayLookahead;
-        for (int i = 0; i < total && !g_sim.died; i++) {
-            if (i == applyAt) {
+        int start = std::max(applyAt, 0);
+        int cap = fixedSteps >= 0 ? fixedSteps : start + g_hacks.maxLookahead;
+        int steps = 0;
+        int grounded = 0;
+        while (steps < cap && !g_sim.died) {
+            if (steps == applyAt) {
                 if (push) sim->pushButton(PlayerButton::Jump);
                 else sim->releaseButton(PlayerButton::Jump);
             }
             sim->update(g_stepDelta);
             this->checkCollisions(sim, g_stepDelta, false);
             sim->updateRotation(g_stepDelta);
+            steps++;
+
+            if (fixedSteps >= 0 || g_sim.died) continue;
+            int since = steps - start;
+            if (isFlying(sim)) {
+                if (since >= FLYING_HORIZON) break;
+            }
+            else if (since >= MIN_AIR_STEPS) {
+                grounded = sim->m_isOnGround ? grounded + 1 : 0;
+                if (grounded >= LANDED_STEPS) break;
+            }
         }
-        bool died = g_sim.died;
+        SimResult result = { g_sim.died, steps };
         g_sim = {};
-        return !died;
+        return result;
     }
 
     // Which real players a jump input moves.
@@ -113,32 +154,37 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         return { p1, p2 };
     }
 
-    bool survivesAt(PendingInput const& input, int applyAt) {
+    // Simulates every player the input moves; dies if any of them does.
+    SimResult simulateInput(PendingInput const& input, int applyAt, int fixedSteps = -1) {
         auto [p1, p2] = this->affectedPlayers(input);
-        if (p1 && !this->simulate(m_player1, applyAt, input.push)) return false;
-        if (p2 && !this->simulate(m_player2, applyAt, input.push)) return false;
-        return true;
+        SimResult result;
+        for (auto [moves, player] : { std::pair{ p1, m_player1 }, std::pair{ p2, m_player2 } }) {
+            if (!moves) continue;
+            auto r = this->simulate(player, applyAt, input.push, fixedSteps);
+            if (r.died) return r;
+            result.steps = std::max(result.steps, r.steps);
+        }
+        return result;
     }
 
-    // Whether holding the input for some of the remaining steps would make
-    // it safe. Checks at most ~6 evenly spaced timings to stay cheap.
-    bool waitingHelps(PendingInput const& input, int remaining) {
-        if (remaining <= 0) return false;
+    // The first of a few evenly spaced later timings (within `remaining`
+    // steps) at which the input is safe, or -1 if none is.
+    int safeLaterTiming(PendingInput const& input, int remaining) {
+        if (remaining <= 0) return -1;
         int stride = std::max(1, remaining / 6);
         for (int k = stride; k <= remaining; k += stride) {
-            if (this->survivesAt(input, k)) return true;
+            if (!this->simulateInput(input, k).died) return k;
         }
-        return false;
+        return -1;
     }
 
     void applyInput(PendingInput const& input) {
         this->handleButton(input.push, static_cast<int>(PlayerButton::Jump), !input.isPlayer2);
     }
 
-    void record(PendingInput const& input, std::string const& what, bool print) {
-        g_lastDecision = fmt::format("{} {}", input.push ? "press" : "release", what);
-        g_lastDecisionStep = m_currentStep;
-        if (print) log::info("Survival delay: {}", g_lastDecision);
+    void report(PendingInput const& input, std::string const& what, int horizon, bool safe) {
+        g_last = { fmt::format("{} {}", input.push ? "press" : "release", what), g_realStep, horizon, safe };
+        log::info("Survival delay: {}", g_last.what);
     }
 
     // Decides what to do with the oldest pending input. Returns false if it
@@ -152,25 +198,40 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         }
         if (input.push) dropped = false;
 
-        int waited = std::max(0, m_currentStep - input.queuedStep);
-        if (this->survivesAt(input, 0)) {
+        int waited = std::max(0, g_realStep - input.queuedStep);
+        auto now = this->simulateInput(input, 0);
+        if (!now.died) {
             this->applyInput(input);
-            if (input.held) this->record(input, fmt::format("held {} steps, then applied", waited), true);
-            else this->record(input, "applied (safe)", false);
+            this->report(input, input.held
+                ? fmt::format("held {} steps, then safe (checked {} steps)", waited, now.steps)
+                : fmt::format("safe (checked {} steps)", now.steps), now.steps, true);
             return true;
         }
-        if (this->waitingHelps(input, g_hacks.delaySteps - waited)) {
-            if (!input.held) this->record(input, "would kill you, holding", true);
+
+        int later = this->safeLaterTiming(input, g_hacks.delaySteps - waited);
+        if (later >= 0) {
+            if (!input.held) {
+                log::info(
+                    "Survival delay: {} now dies in {} steps, safe {} steps later; holding",
+                    input.push ? "press" : "release", now.steps, later
+                );
+            }
             input.held = true;
             return false;
         }
-        if (input.push && this->survivesAt(input, -1)) {
+
+        auto never = this->simulateInput(input, -1, now.steps);
+        if (input.push && !never.died) {
             dropped = true;
-            this->record(input, fmt::format("cancelled after {} steps", waited), true);
+            this->report(input, fmt::format(
+                "dies in {} steps, not jumping survives; cancelled after {} steps", now.steps, waited
+            ), now.steps, true);
             return true;
         }
         this->applyInput(input);
-        this->record(input, "deadly at every timing, applied anyway", true);
+        this->report(input, fmt::format(
+            "dies in {} steps, not pressing dies in {}; applied anyway", now.steps, never.steps
+        ), now.steps, false);
         return true;
     }
 
@@ -194,7 +255,7 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         // Take this frame's jump inputs out of GD's queue.
         for (auto it = m_queuedButtons.begin(); it != m_queuedButtons.end();) {
             if (it->m_button == PlayerButton::Jump) {
-                pending.push_back({ it->m_isPush, it->m_isPlayer2, m_currentStep });
+                pending.push_back({ it->m_isPush, it->m_isPlayer2, g_realStep });
                 it = m_queuedButtons.erase(it);
             }
             else {
@@ -271,7 +332,11 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
 
 class $modify(SurvivalDelayPlayer, PlayerObject) {
     void update(float dt) {
-        if (!g_sim.active) g_stepDelta = dt;
+        if (!g_sim.active) {
+            g_stepDelta = dt;
+            auto playLayer = PlayLayer::get();
+            if (playLayer && this == playLayer->m_player1) g_realStep++;
+        }
         PlayerObject::update(dt);
     }
     void incrementJumps() {
@@ -292,10 +357,14 @@ class $modify(SurvivalDelayPlayLayer, PlayLayer) {
     void destroyPlayer(PlayerObject* player, GameObject* object) {
         if (!g_sim.active && g_hacks.survivalDelay && !g_hacks.noclip
             && object != m_anticheatSpike && player && !player->m_isDead) {
-            log::info(
-                "Survival delay: died; last input was {} ({} steps before)",
-                g_lastDecision, m_currentStep - g_lastDecisionStep
-            );
+            int since = g_realStep - g_last.step;
+            log::info("Survival delay: died {} steps after last input ({})", since, g_last.what);
+            if (g_last.safe && since < g_last.horizon) {
+                log::warn(
+                    "Survival delay: MISPREDICTED - copy survived {} steps, real player died after {}",
+                    g_last.horizon, since
+                );
+            }
         }
         PlayLayer::destroyPlayer(player, object);
     }
