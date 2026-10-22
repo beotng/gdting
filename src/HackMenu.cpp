@@ -15,13 +15,49 @@ namespace {
 
     constexpr ToggleDef TOGGLES[] = {
         { "noclip", "Noclip", &HackState::noclip },
+        { "hitboxes", "Show hitboxes", &HackState::hitboxes },
         { "speedhack", "Speedhack", &HackState::speedhack },
         { "speedhack-audio", "Speedhack audio", &HackState::speedhackAudio },
-        { "hitboxes", "Show hitboxes", &HackState::hitboxes },
+        { "click-buffer", "Click buffer", &HackState::clickBuffer },
+        { "frame-advance", "Frame advance", &HackState::frameAdvance },
+        { "fps-bypass", "FPS bypass", &HackState::fpsBypass },
+        { "safe-mode", "Safe mode", &HackState::safeMode },
+        { "cheat-indicator", "Cheat indicator", &HackState::cheatIndicator },
     };
 
-    constexpr float WIDTH = 280.f;
-    constexpr float HEIGHT = 250.f;
+    struct NumberDef {
+        char const* key;
+        char const* label;
+        double min;
+        double max;
+        bool isInt;
+    };
+
+    constexpr NumberDef NUMBERS[] = {
+        { "speed", "Speed", .1, 10., false },
+        { "fps", "FPS", 30., 1000., false },
+        { "buffer-steps", "Buffer steps", 1., 60., true },
+        { "advance-steps", "Advance steps", 1., 60., true },
+    };
+
+    constexpr float WIDTH = 420.f;
+    constexpr float HEIGHT = 290.f;
+    constexpr float COLUMN_WIDTH = WIDTH / 2.f;
+    constexpr float ROW_HEIGHT = 30.f;
+    constexpr float TOP = HEIGHT - 55.f;
+
+    // Toggles and inputs are laid out left to right, two per row.
+    CCPoint cellOrigin(int index) {
+        return { (index % 2) * COLUMN_WIDTH, TOP - (index / 2) * ROW_HEIGHT };
+    }
+
+    void addLabel(CCNode* parent, char const* text, CCPoint pos) {
+        auto label = CCLabelBMFont::create(text, "bigFont.fnt");
+        label->setScale(.4f);
+        label->setAnchorPoint({ 0.f, .5f });
+        label->setPosition(pos);
+        parent->addChild(label);
+    }
 }
 
 HackMenu* HackMenu::create() {
@@ -53,49 +89,69 @@ bool HackMenu::initMenu() {
     menu->setContentSize({ WIDTH, HEIGHT });
     m_mainLayer->addChild(menu);
 
-    float y = HEIGHT - 60.f;
+    int cell = 0;
     for (int i = 0; i < static_cast<int>(std::size(TOGGLES)); i++) {
-        this->addToggle(menu, i, y);
-        y -= 35.f;
+        this->addToggle(menu, i, cellOrigin(cell++));
+    }
+    // Number inputs start on a fresh row.
+    cell += cell % 2;
+    for (auto const& def : NUMBERS) {
+        this->addNumberInput(def.key, def.label, def.min, def.max, def.isInt, cellOrigin(cell++));
     }
 
-    auto speedLabel = CCLabelBMFont::create("Speed", "bigFont.fnt");
-    speedLabel->setScale(.5f);
-    speedLabel->setAnchorPoint({ 0.f, .5f });
-    speedLabel->setPosition({ 30.f, y });
-    m_mainLayer->addChild(speedLabel);
-
-    auto speedInput = TextInput::create(90.f, "1.00");
-    speedInput->setCommonFilter(CommonFilter::Float);
-    speedInput->setString(fmt::format("{:.2f}", g_hacks.speed));
-    speedInput->setPosition({ WIDTH - 75.f, y });
-    speedInput->setCallback([](std::string const& text) {
-        char* end = nullptr;
-        double value = std::strtod(text.c_str(), &end);
-        if (end == text.c_str()) return;
-        Mod::get()->setSettingValue<double>("speed", std::clamp(value, 0.1, 10.0));
-    });
-    m_mainLayer->addChild(speedInput);
+    auto hint = CCLabelBMFont::create(
+        "Tab: menu   F6: frame advance   F7: step   F8: click buffer", "chatFont.fnt"
+    );
+    hint->setScale(.6f);
+    hint->setOpacity(180);
+    hint->setPosition({ WIDTH / 2.f, 16.f });
+    m_mainLayer->addChild(hint);
 
     return true;
 }
 
-void HackMenu::addToggle(CCMenu* menu, int index, float y) {
+void HackMenu::addToggle(CCMenu* menu, int index, CCPoint origin) {
     auto const& def = TOGGLES[index];
 
-    auto label = CCLabelBMFont::create(def.label, "bigFont.fnt");
-    label->setScale(.5f);
-    label->setAnchorPoint({ 0.f, .5f });
-    label->setPosition({ 30.f, y });
-    m_mainLayer->addChild(label);
+    addLabel(m_mainLayer, def.label, { origin.x + 20.f, origin.y });
 
     auto toggler = CCMenuItemToggler::createWithStandardSprites(
-        this, menu_selector(HackMenu::onToggle), .7f
+        this, menu_selector(HackMenu::onToggle), .6f
     );
     toggler->toggle(g_hacks.*def.field);
     toggler->setTag(index);
-    toggler->setPosition({ WIDTH - 45.f, y });
+    toggler->setPosition({ origin.x + COLUMN_WIDTH - 30.f, origin.y });
     menu->addChild(toggler);
+}
+
+void HackMenu::addNumberInput(
+    char const* key, char const* label, double min, double max, bool isInt, CCPoint origin
+) {
+    addLabel(m_mainLayer, label, { origin.x + 20.f, origin.y });
+
+    auto input = TextInput::create(60.f, isInt ? "1" : "1.00");
+    input->setCommonFilter(isInt ? CommonFilter::Uint : CommonFilter::Float);
+    input->setScale(.8f);
+    input->setPosition({ origin.x + COLUMN_WIDTH - 45.f, origin.y });
+    if (isInt) {
+        input->setString(std::to_string(Mod::get()->getSettingValue<int64_t>(key)));
+    }
+    else {
+        input->setString(fmt::format("{:.2f}", Mod::get()->getSettingValue<double>(key)));
+    }
+    input->setCallback([key, min, max, isInt](std::string const& text) {
+        char* end = nullptr;
+        double value = std::strtod(text.c_str(), &end);
+        if (end == text.c_str()) return;
+        value = std::clamp(value, min, max);
+        if (isInt) {
+            Mod::get()->setSettingValue<int64_t>(key, static_cast<int64_t>(value));
+        }
+        else {
+            Mod::get()->setSettingValue<double>(key, value);
+        }
+    });
+    m_mainLayer->addChild(input);
 }
 
 void HackMenu::onToggle(CCObject* sender) {

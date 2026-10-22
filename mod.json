@@ -5,9 +5,9 @@
 	},
 	"id": "beotng.hack-menu",
 	"name": "Hack Menu",
-	"version": "v1.0.0",
+	"version": "v1.1.0",
 	"developer": "beotng",
-	"description": "A small mod menu with noclip, speedhack and hitboxes.",
+	"description": "A mod menu with noclip, speedhack, hitboxes, click buffer, frame advance, FPS bypass and safe mode.",
 	"dependencies": {
 		"geode.node-ids": ">=v1.23.3"
 	},
@@ -48,6 +48,74 @@
 			"name": "Show hitboxes",
 			"description": "Draw hitboxes outside practice mode too.",
 			"default": false
+		},
+		"click-buffer": {
+			"type": "bool",
+			"name": "Click buffer",
+			"description": "Holds jump clicks that would do nothing (mid-air, no orb) and fires them once you land or touch an orb. Forces safe mode.",
+			"default": false
+		},
+		"buffer-steps": {
+			"type": "int",
+			"name": "Buffer steps",
+			"description": "How many physics steps (240 per second) a click can be held.",
+			"default": 15,
+			"min": 1,
+			"max": 60,
+			"control": {
+				"input": true,
+				"slider": true,
+				"slider-step": 1
+			}
+		},
+		"frame-advance": {
+			"type": "bool",
+			"name": "Frame advance",
+			"description": "Freezes gameplay. Press F7 to step forward. Forces safe mode.",
+			"default": false
+		},
+		"advance-steps": {
+			"type": "int",
+			"name": "Advance steps",
+			"description": "Physics steps run per F7 press.",
+			"default": 1,
+			"min": 1,
+			"max": 60,
+			"control": {
+				"input": true,
+				"slider": true,
+				"slider-step": 1
+			}
+		},
+		"fps-bypass": {
+			"type": "bool",
+			"name": "FPS bypass",
+			"description": "Use your own frame rate instead of GD's. Turn VSync off for it to go above your refresh rate.",
+			"default": false
+		},
+		"fps": {
+			"type": "float",
+			"name": "FPS",
+			"description": "Frame rate used while FPS bypass is on.",
+			"default": 240.0,
+			"min": 30.0,
+			"max": 1000.0,
+			"control": {
+				"input": true,
+				"slider": false
+			}
+		},
+		"safe-mode": {
+			"type": "bool",
+			"name": "Safe mode",
+			"description": "Don't save any progress from attempts. Always on while click buffer, frame advance or speedhack is active.",
+			"default": false
+		},
+		"cheat-indicator": {
+			"type": "bool",
+			"name": "Cheat indicator",
+			"description": "Shows 'Cheating' or 'Safe mode' in the corner while playing.",
+			"default": true
 		}
 	}
 }
