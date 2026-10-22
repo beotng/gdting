@@ -5,7 +5,7 @@
 	},
 	"id": "beotng.hack-menu",
 	"name": "Hack Menu",
-	"version": "v1.2.3",
+	"version": "v1.2.4",
 	"developer": "beotng",
 	"description": "A mod menu with noclip, speedhack, hitboxes, click buffer, survival delay, frame advance, FPS bypass and safe mode.",
 	"dependencies": {

@@ -38,6 +38,12 @@ namespace {
     // Real physics steps taken by player 1, used to time inputs.
     int g_realStep = 0;
 
+    // How long you usually hold jump, in real steps: a moving average of your
+    // recent clicks. A simulated press is released after this long, instead
+    // of being held forever (which on cube means bouncing nonstop).
+    int g_holdSteps = 15;
+    int g_pressStep[2] = { -1, -1 };
+
     // How far an input's trajectory is followed. Ground modes: until the
     // player has landed and stayed down a moment. Flying modes: a short
     // window, since the next input comes soon anyway.
@@ -125,6 +131,9 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
                 if (push) sim->pushButton(PlayerButton::Jump);
                 else sim->releaseButton(PlayerButton::Jump);
             }
+            if (push && applyAt >= 0 && steps == applyAt + g_holdSteps) {
+                sim->releaseButton(PlayerButton::Jump);
+            }
             sim->update(g_stepDelta);
             this->checkCollisions(sim, g_stepDelta, false);
             sim->updateRotation(g_stepDelta);
@@ -180,10 +189,22 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
 
     void applyInput(PendingInput const& input) {
         this->handleButton(input.push, static_cast<int>(PlayerButton::Jump), !input.isPlayer2);
+
+        // Learn how long presses are held.
+        int player = input.isPlayer2 ? 1 : 0;
+        if (input.push) {
+            g_pressStep[player] = g_realStep;
+        }
+        else if (g_pressStep[player] >= 0) {
+            int held = g_realStep - g_pressStep[player];
+            g_holdSteps = std::clamp((g_holdSteps * 3 + held) / 4, 2, 60);
+            g_pressStep[player] = -1;
+        }
     }
 
     void report(PendingInput const& input, std::string const& what, int horizon, bool safe) {
-        g_last = { fmt::format("{} {}", input.push ? "press" : "release", what), g_realStep, horizon, safe };
+        auto hold = input.push ? fmt::format(" [assumed hold {} steps]", g_holdSteps) : std::string();
+        g_last = { fmt::format("{} {}{}", input.push ? "press" : "release", what, hold), g_realStep, horizon, safe };
         log::info("Survival delay: {}", g_last.what);
     }
 
