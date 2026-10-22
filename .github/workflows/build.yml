@@ -6,6 +6,9 @@ on:
     branches:
       - "**"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build (Windows)
@@ -25,3 +28,17 @@ jobs:
         with:
           name: hack-menu
           path: ${{ steps.build.outputs.build-output }}/*.geode
+
+      # Keeps one rolling "latest-build" release up to date with main, so
+      # installer/install.ps1 always has a .geode file to download.
+      - name: Publish latest build
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest-build --yes --cleanup-tag || true
+          gh release create latest-build ${{ steps.build.outputs.build-output }}/*.geode \
+            --title "Latest build" \
+            --notes "Built automatically from ${{ github.sha }}." \
+            --target ${{ github.sha }}

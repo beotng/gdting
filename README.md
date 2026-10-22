@@ -17,6 +17,16 @@ Every option is also under Geode → Hack Menu → Settings.
 | Speedhack | `CCScheduler::update` | Multiply every frame's delta time; set FMOD master pitch |
 | Hitboxes | `PlayLayer::postUpdate` | Call GD's built-in `updateDebugDraw()` every frame |
 
+## Installing
+
+Download this repo (Code → Download ZIP), unzip it, and double-click
+`installer/install.bat`. It finds Geometry Dash through Steam (or asks you for
+the folder), installs Geode if you don't have it, and puts the latest build
+of the mod in `geode/mods`. Run it again any time to update.
+
+The installer downloads from the `latest-build` release, which the workflow
+rebuilds on every push to `main`.
+
 ## Building
 
 ### In the cloud (no setup)
