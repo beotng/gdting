@@ -33,12 +33,17 @@ jobs:
       # installer/install.ps1 always has a .geode file to download.
       - name: Publish latest build
         if: github.ref == 'refs/heads/main'
-        shell: bash
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          gh release delete latest-build --yes --cleanup-tag || true
-          gh release create latest-build ${{ steps.build.outputs.build-output }}/*.geode \
-            --title "Latest build" \
-            --notes "Built automatically from ${{ github.sha }}." \
+          # The build output is a Windows path, so this step uses PowerShell
+          # (bash would eat the backslashes).
+          gh release delete latest-build --yes --cleanup-tag 2>$null
+          $files = Get-ChildItem -LiteralPath "${{ steps.build.outputs.build-output }}" -Filter *.geode |
+            ForEach-Object FullName
+          gh release create latest-build @files `
+            --title "Latest build" `
+            --notes "Built automatically from ${{ github.sha }}." `
             --target ${{ github.sha }}
