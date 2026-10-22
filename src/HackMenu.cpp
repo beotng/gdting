@@ -39,8 +39,8 @@ namespace {
         { "fps", "FPS", 30., 1000., false },
         { "buffer-steps", "Buffer steps", 1., 60., true },
         { "advance-steps", "Advance steps", 1., 60., true },
-        { "delay-frames", "Max delay", 1., 60., true },
-        { "delay-lookahead", "Lookahead", 10., 480., true },
+        { "delay-frames", "Max delay", 1., 30., true },
+        { "delay-lookahead", "Lookahead", 10., 240., true },
     };
 
     constexpr float WIDTH = 420.f;
@@ -103,7 +103,7 @@ bool HackMenu::initMenu() {
     }
 
     auto hint = CCLabelBMFont::create(
-        "Tab: menu   F6: frame advance   F7: step   F8: click buffer   F9: survival delay", "chatFont.fnt"
+        "F2: menu   F6: frame advance   F7: step   F8: click buffer   F9: survival delay", "chatFont.fnt"
     );
     hint->setScale(.6f);
     hint->setOpacity(180);

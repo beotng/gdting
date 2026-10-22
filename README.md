@@ -8,9 +8,10 @@ A small Geode mod for Geometry Dash 2.2081 (Windows) with:
 - **Click buffer**: a jump click that would do nothing (mid-air on cube, ball,
   robot or spider, with no orb) is held for up to N physics steps and fires as
   soon as you land or touch an orb.
-- **Survival delay**: each jump press or release is held until the first frame
-  where it won't kill you (checked by simulating ahead from a checkpoint), up
-  to N frames. Safe inputs go through right away. Meant for tight wave spam.
+- **Survival delay**: a jump press or release that would kill you is held for up
+  to N frames until it's safe, and a press that's still deadly is cancelled.
+  Checked by stepping an invisible copy of you ahead; the real game is never
+  rewound. Safe inputs go through right away.
 - **Frame advance**: freeze gameplay and step forward N physics steps at a time.
 - **FPS bypass**: pick your own frame rate.
 - **Safe mode**: nothing from the attempt is saved. Forced on while click
@@ -36,7 +37,7 @@ Every option is also under Geode → Hack Menu → Settings.
 | Speedhack | `CCScheduler::update` | Multiply every frame's delta time; set FMOD master pitch |
 | Hitboxes | `PlayLayer::postUpdate` | Call GD's built-in `updateDebugDraw()` every frame |
 | Click buffer | `GJBaseGameLayer::processQueuedButtons` | Pull wasted jump pushes out of the input queue, replay them with `handleButton` when they'd work |
-| Survival delay | `GJBaseGameLayer::update` | Pull jump inputs from the queue; for each, `createCheckpoint`, apply it, run the lookahead, `loadFromCheckpoint`; apply once it survives |
+| Survival delay | `GJBaseGameLayer::update` | Pull jump inputs from the queue; `copyAttributes` the player onto a hidden `PlayerObject`, step it with `update` + `checkCollisions` with and without the input; hold or cancel deadly ones |
 | Frame advance | `GJBaseGameLayer::update` | Skip updates while frozen; run one 240 Hz step per queued step |
 | FPS bypass | `CCDisplayLinkDirector::setAnimationInterval` | Replace the interval GD asks for with our own |
 | Safe mode | `PlayLayer::destroyPlayer`, `levelComplete` | Pretend to be a start position run (`m_isTestMode`), which GD never saves |
