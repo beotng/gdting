@@ -28,6 +28,9 @@ $on_mod(Loaded) {
     bind<bool>("show-trajectory", [](bool v) { g_hacks.showTrajectory = v; });
     bind<int64_t>("delay-steps", [](int64_t v) { g_hacks.delaySteps = static_cast<int>(v); });
     bind<int64_t>("max-lookahead", [](int64_t v) { g_hacks.maxLookahead = static_cast<int>(v); });
+    bind<bool>("coyote-time", [](bool v) { g_hacks.coyoteTime = v; });
+    bind<int64_t>("coyote-steps", [](int64_t v) { g_hacks.coyoteSteps = static_cast<int>(v); });
+    bind<bool>("assist-hud", [](bool v) { g_hacks.assistHud = v; });
     bind<bool>("cheat-indicator", [](bool v) { g_hacks.cheatIndicator = v; });
     // fps-bypass and fps are bound in FpsBypass.cpp, since changing them
     // has to re-apply the frame rate.

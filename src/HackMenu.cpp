@@ -21,6 +21,8 @@ namespace {
         { "click-buffer", "Click buffer", &HackState::clickBuffer },
         { "survival-delay", "Survival delay", &HackState::survivalDelay },
         { "show-trajectory", "Show trajectory", &HackState::showTrajectory },
+        { "coyote-time", "Coyote time", &HackState::coyoteTime },
+        { "assist-hud", "Assist HUD", &HackState::assistHud },
         { "frame-advance", "Frame advance", &HackState::frameAdvance },
         { "fps-bypass", "FPS bypass", &HackState::fpsBypass },
         { "safe-mode", "Safe mode", &HackState::safeMode },
@@ -42,13 +44,14 @@ namespace {
         { "advance-steps", "Advance steps", 1., 60., true },
         { "delay-steps", "Max delay", 1., 60., true },
         { "max-lookahead", "Max lookahead", 60., 480., true },
+        { "coyote-steps", "Coyote steps", 1., 30., true },
     };
 
     constexpr float WIDTH = 420.f;
     constexpr float HEIGHT = 320.f;
     constexpr float COLUMN_WIDTH = WIDTH / 2.f;
-    constexpr float ROW_HEIGHT = 27.f;
-    constexpr float TOP = HEIGHT - 55.f;
+    constexpr float ROW_HEIGHT = 22.f;
+    constexpr float TOP = HEIGHT - 50.f;
 
     // Toggles and inputs are laid out left to right, two per row.
     CCPoint cellOrigin(int index) {
@@ -120,7 +123,7 @@ void HackMenu::addToggle(CCMenu* menu, int index, CCPoint origin) {
     addLabel(m_mainLayer, def.label, { origin.x + 20.f, origin.y });
 
     auto toggler = CCMenuItemToggler::createWithStandardSprites(
-        this, menu_selector(HackMenu::onToggle), .6f
+        this, menu_selector(HackMenu::onToggle), .5f
     );
     toggler->toggle(g_hacks.*def.field);
     toggler->setTag(index);

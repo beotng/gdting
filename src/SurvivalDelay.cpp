@@ -3,6 +3,7 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/PlayerObject.hpp>
 #include <Geode/modify/MenuLayer.hpp>
+#include "Assist.hpp"
 #include "Simulation.hpp"
 #include "State.hpp"
 
@@ -301,6 +302,7 @@ class $modify(SurvivalDelayLayer, GJBaseGameLayer) {
         auto now = this->simulateInput(input, 0);
         if (!now.died) {
             this->applyInput(input);
+            if (input.held) reportAssist("Delay", waited);
             this->report(input, input.held
                 ? fmt::format("held {} steps, then safe (checked {} steps)", waited, now.steps)
                 : fmt::format("safe (checked {} steps)", now.steps), now.steps, true);

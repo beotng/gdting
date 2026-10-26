@@ -5,7 +5,7 @@
 	},
 	"id": "beotng.hack-menu",
 	"name": "Hack Menu",
-	"version": "v1.3.1",
+	"version": "v1.4.0",
 	"developer": "beotng",
 	"description": "A mod menu with noclip, speedhack, hitboxes, click buffer, survival delay, frame advance, FPS bypass and safe mode.",
 	"dependencies": {
@@ -106,6 +106,31 @@
 				"slider-step": 10
 			}
 		},
+		"coyote-time": {
+			"type": "bool",
+			"name": "Coyote time",
+			"description": "A jump pressed a few steps after walking off an edge still jumps. Forces safe mode.",
+			"default": false
+		},
+		"coyote-steps": {
+			"type": "int",
+			"name": "Coyote steps",
+			"description": "How many physics steps (240 per second) after walking off an edge a jump still counts.",
+			"default": 8,
+			"min": 1,
+			"max": 30,
+			"control": {
+				"input": true,
+				"slider": true,
+				"slider-step": 1
+			}
+		},
+		"assist-hud": {
+			"type": "bool",
+			"name": "Assist HUD",
+			"description": "Top-left label showing when click buffer, survival delay or coyote time changed an input, and by how many steps.",
+			"default": true
+		},
 		"frame-advance": {
 			"type": "bool",
 			"name": "Frame advance",
@@ -146,7 +171,7 @@
 		"safe-mode": {
 			"type": "bool",
 			"name": "Safe mode",
-			"description": "Don't save any progress from attempts. Always on while click buffer, survival delay, frame advance or speedhack is active.",
+			"description": "Don't save any progress from attempts. Always on while click buffer, survival delay, coyote time, frame advance or speedhack is active.",
 			"default": false
 		},
 		"cheat-indicator": {

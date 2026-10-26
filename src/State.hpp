@@ -20,11 +20,14 @@ struct HackState {
     bool showTrajectory = false;
     int delaySteps = 16;
     int maxLookahead = 240;
+    bool coyoteTime = false;
+    int coyoteSteps = 8;
+    bool assistHud = true;
 
     // Hacks GD's own anticheat can't see. While any of these is on, safe
     // mode is forced so the attempt can't save progress or a new best.
     bool undetectedCheats() const {
-        return clickBuffer || survivalDelay || frameAdvance || (speedhack && speed != 1.f);
+        return clickBuffer || survivalDelay || coyoteTime || frameAdvance || (speedhack && speed != 1.f);
     }
 
     bool safeModeActive() const {

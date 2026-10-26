@@ -1,5 +1,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/modify/GJBaseGameLayer.hpp>
+#include "Assist.hpp"
 #include "Simulation.hpp"
 #include "State.hpp"
 
@@ -122,6 +123,7 @@ class $modify(ClickBufferLayer, GJBaseGameLayer) {
             held.age++;
             if (clickWouldDoSomething(this->playerAt(i)) || held.age > g_hacks.bufferSteps) {
                 this->sendJump(true, held.isPlayer2);
+                reportAssist("Buffer", held.age);
                 if (held.released) {
                     fields->m_releaseNext[i] = true;
                     fields->m_releaseNextIsPlayer2[i] = held.isPlayer2;

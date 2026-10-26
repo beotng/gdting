@@ -15,10 +15,15 @@ A small Geode mod for Geometry Dash 2.2081 (Windows) with:
 - **Show trajectory**: draws survival delay's prediction from right now, like
   trajectory views in other mod menus: green with your next input, gray
   without, red box where a path dies.
+- **Coyote time**: a jump pressed up to N physics steps after walking off an
+  edge still jumps. The late side of the leeway, to go with click buffer and
+  survival delay on the early side.
+- **Assist HUD**: top-left label when an assist changed an input, e.g.
+  `Delay +6t` (held 6 steps) or `Coyote -3t` (3 steps late).
 - **Frame advance**: freeze gameplay and step forward N physics steps at a time.
 - **FPS bypass**: pick your own frame rate.
 - **Safe mode**: nothing from the attempt is saved. Forced on while click
-  buffer, survival delay, frame advance or speedhack is active, since GD can't detect those.
+  buffer, survival delay, coyote time, frame advance or speedhack is active, since GD can't detect those.
 - **Cheat indicator**: "Cheating" / "Safe mode" label in the corner.
 
 Open the menu with **F2**, or with the **Hacks** button in the pause menu.
@@ -41,6 +46,7 @@ Every option is also under Geode → Hack Menu → Settings.
 | Hitboxes | `PlayLayer::postUpdate` | Call GD's built-in `updateDebugDraw()` every frame |
 | Click buffer | `GJBaseGameLayer::processQueuedButtons` | Pull wasted jump pushes out of the input queue, replay them with `handleButton` when they'd work |
 | Survival delay | `GJBaseGameLayer::update` | Pull jump inputs from the queue; `copyAttributes` the player onto a hidden `PlayerObject`, step it with `update` + `checkCollisions` with and without the input; hold or cancel deadly ones |
+| Coyote time | `PlayerObject::update`, `GJBaseGameLayer::handleButton` | Count steps since walking off the ground; on a late press, set the ground flag for one step so GD's own jump check fires |
 | Frame advance | `GJBaseGameLayer::update` | Skip updates while frozen; run one 240 Hz step per queued step |
 | FPS bypass | `CCDisplayLinkDirector::setAnimationInterval` | Replace the interval GD asks for with our own |
 | Safe mode | `PlayLayer::destroyPlayer`, `levelComplete` | Pretend to be a start position run (`m_isTestMode`), which GD never saves |
